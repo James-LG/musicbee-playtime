@@ -19,7 +19,7 @@ def time_to_human(seconds):
     :returns: a string of the form "DD days, HH hours, MM minites and
     SS seconds".
     """
-    assert seconds >= 0, "number of seconds should be nonnegative"
+    assert seconds >= 0 #number of seconds should be nonnegative
     dd = int(seconds) // 86400 # days
     hh = (int(seconds) // 3600) % 24 # hours
     mm = (int(seconds) // 60) % 60 # minutes
@@ -53,7 +53,10 @@ def itunes_total_time(library_plist=None, tag_key="Album Artist", optional_key=N
     """
     Prints the time spent on each track grouped by tag_key.
     
-    :param library_plist: path to the iTunes Music Library plist file
+    :param library_plist: path to the iTunes Music Library plist file.
+    :param tag_key: Metadata tag to group by.
+    :param optional_key: Add a tag to the grouped tag for readability.
+    :returns: List of tuples ordered by time where the tag_key is the first item and a dict with time, time_human, avg_time_human and count is stored.
     """
 
     with open(library_plist, "rb") as fp:
@@ -62,12 +65,11 @@ def itunes_total_time(library_plist=None, tag_key="Album Artist", optional_key=N
     if 'Tracks' not in tree:
         return 0
 
-    time_dict = {}
-    count_dict = {}
-    for _, track in tree['Tracks'].items():
+    tag_dict = {}
+    for track in tree['Tracks'].values():
         try:
-            if 'Album Artist' not in track:
-                print("missing album artist",unidecode(track['Artist']),unidecode(track['Name']))
+            if tag_key not in track:
+                print("missing " + tag_key + " tag",unidecode(track['Artist']),unidecode(track['Name']))
             if 'audio' in track['Kind'] and 'Total Time' in track and 'Play Count' in track:
                 curr_key = track[tag_key]
                 curr_key = get_alias(curr_key)
@@ -75,31 +77,35 @@ def itunes_total_time(library_plist=None, tag_key="Album Artist", optional_key=N
                 if optional_key:
                     curr_key += " (" + get_alias(track[optional_key]) + ")"
 
-                if curr_key not in time_dict:
-                    time_dict[curr_key] = 0
-                    count_dict[curr_key] = 0
-                time_dict[curr_key] += track['Total Time'] * track['Play Count'] # milliseconds
-                count_dict[curr_key] += track['Play Count']
+                if curr_key not in tag_dict:
+                    tag_dict[curr_key] = {'time':0, 'count':0}
+                tag_dict[curr_key]['time'] += track['Total Time'] * track['Play Count'] / 1000
+                tag_dict[curr_key]['count'] += track['Play Count']
             else:
                 #print("skipping",unidecode(track['Artist']),unidecode(track['Name']))
                 pass
         except KeyError:
             pass
+
+    # Add a total
+    total_count = sum(x['count'] for x in tag_dict.values())
+    total_time = sum(x ['time'] for x in tag_dict.values())
+    tag_dict['Total Time'] = {'time': total_time, 'count': total_count}
     
     #Print each time
-    sorted_times = sorted(time_dict.items(), key=operator.itemgetter(1))
-    for curr_key,time in sorted_times:
-        time = time / 1000
-        time_human = time_to_human(time)
-        print("%s: %.0f sec (%s) with %s plays (%s avg)" % (unidecode(curr_key), time, time_human, count_dict[curr_key], time_to_human(time/count_dict[curr_key])))
+    sorted_times = sorted(tag_dict.items(), key=lambda kv: kv[1]['time'])
+    for curr_key, curr_dict in sorted_times:
+        time_human = time_to_human(curr_dict['time'])
+        curr_dict['time_human'] = time_human
+        curr_dict['avg_time_human'] = time_to_human(curr_dict['time']/curr_dict['count'])
     
-    #Print a total
-    total_count = sum(count_dict.values())
-    total_time = sum(time_dict.values()) / 1000
-    total_time_human = time_to_human(total_time)
-    print("Total: %.0f sec (%s) with %s plays (%s avg)" % (total_time, total_time_human, total_count, time_to_human(total_time/total_count)))
+    return sorted_times
 
-def main(file_path):
+def print_sorted(sorted_times):
+    for curr_key, curr_dict in sorted_times:
+        print("%s: %.0f sec (%s) with %s plays (%s avg)" % (unidecode(curr_key), curr_dict['time'], curr_dict['time_human'], curr_dict['count'], curr_dict['avg_time_human']))
+
+def main(file_path=XML_PATH):
     """
     Prints the time listened by Album then by Album Artist.
     
@@ -107,9 +113,9 @@ def main(file_path):
     """
     try:
         print("------\nALBUM\n------")
-        total_time = itunes_total_time(file_path, tag_key="Album", optional_key="Album Artist")
+        print_sorted(itunes_total_time(file_path, tag_key="Album", optional_key="Album Artist"))
         print("------\nARTIST\n------")
-        total_time = itunes_total_time(file_path)
+        print_sorted(itunes_total_time(file_path))
     except FileNotFoundError as err:
         print(err, file=sys.stderr)
         exit(1)
@@ -117,4 +123,4 @@ def main(file_path):
     
 
 if __name__ == '__main__':
-    main(XML_PATH)
+    main()
