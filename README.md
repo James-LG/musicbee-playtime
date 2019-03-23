@@ -13,4 +13,5 @@ Make sure the key is itself in the list of aliases.
 
 # Requirements
 Python obviously
+
 unidecode: Used to prevent strange characters from crashing during print.
