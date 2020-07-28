@@ -5,6 +5,7 @@ import plistlib
 import sys
 import operator
 from unidecode import unidecode
+from tabulate import tabulate
 
 ALIAS_DICT = {
     'MF Doom': ['Doom','MF Doom','Danger Doom','King Geedorah','Madvillain','Viktor Vaughn'],
@@ -102,8 +103,11 @@ def itunes_total_time(library_plist=None, tag_key="Album Artist", optional_key=N
     return sorted_times
 
 def print_sorted(sorted_times):
+    table_rows = []
     for curr_key, curr_dict in sorted_times:
-        print("%s: %.0f sec (%s) with %s plays (%s avg)" % (unidecode(curr_key), curr_dict['time'], curr_dict['time_human'], curr_dict['count'], curr_dict['avg_time_human']))
+        table_rows.append([unidecode(curr_key), curr_dict['time_human'], curr_dict['count'], curr_dict['avg_time_human']])
+        
+    print(tabulate(table_rows, headers=['Name', 'Time', 'Play Count', 'Avg Song Time']))
 
 def main(file_path=XML_PATH):
     """
